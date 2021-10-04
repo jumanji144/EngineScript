@@ -2,6 +2,8 @@ package enginescript.runtime.vm;
 
 import enginescript.EngineParser.EngineScriptVisitor;
 import enginescript.runtime.object.Variable;
+import enginescript.runtime.proto.FunctionPrototype;
+import enginescript.runtime.proto.TypePrototype;
 import enginescript.runtime.proto.VariablePrototype;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
@@ -11,6 +13,7 @@ import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 
@@ -40,11 +43,53 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
     }
 
+    public void enterScope() {
+
+        previousScope = currentScope;
+
+        Scope scope = new Scope(vm);
+
+        scope.parent = previousScope;
+
+        currentScope = scope;
+
+    }
+
+    public void leaveScope() {
+
+        previousScope = currentScope;
+
+        if(currentScope.parent != null)
+            currentScope = currentScope.parent;
+
+    }
+
     public Object eval(ExpressionContext expression) {
 
         expression.accept(this); // children of expressions should push a value to the stack
 
         return stack.poll(); // then we return the stack pushed value
+
+    }
+
+    public void callFunction(FunctionPrototype function) {
+
+        enterScope(); // function upper
+
+        for(VariablePrototype prototype : function.parameters) {
+
+            Variable variable = currentScope.createVariable(prototype);
+            variable.setValue(pullFromStack());
+
+        }
+
+        /**
+         * there is an extra scope layer such that it is possible to overwrite the parameters using locals
+         */
+
+        function.block.accept(this);
+
+        leaveScope();
 
     }
 
@@ -90,26 +135,18 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     @Override
     public Void visitBlock(BlockContext ctx) {
 
-        Scope blockScope = new Scope(vm);
-
         List<StatementContext> statements = ctx.statement();
 
-        previousScope = currentScope;
-
-        currentScope = blockScope;
-
-        currentScope.parent = previousScope;
+        enterScope();
 
         statements.forEach(statement -> statement.accept(this)); // execute block code
 
-        previousScope = currentScope.parent;
+        leaveScope();
 
-
-        if (previousScope == null) { // no code to return to
+        if (currentScope == null) { // no code to return to
             if (vm.HALT_ON_END)
                 vm.halt(Codes.STATUS_SUCCESS); // stop execution
-        } else
-            currentScope = previousScope; // return to previous scope
+        }
 
         return null;
     }
@@ -125,6 +162,18 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     @Override
     public Void visitComparisonExpression(ComparisonExpressionContext ctx) {
         return null;
+    }
+
+    public VariablePrototype create(String typeName, String varName) {
+
+        VariablePrototype prototype = new VariablePrototype();
+
+        prototype.typeName = typeName;
+        prototype.id = varName;
+        prototype.scope = currentScope;
+
+        return prototype;
+
     }
 
     @Override
@@ -157,13 +206,7 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
             String typeName = nodes.get(0).getText();
             String varName = nodes.get(1).getText();
 
-            VariablePrototype prototype = new VariablePrototype();
-
-            prototype.typeName = typeName;
-            prototype.id = varName;
-            prototype.scope = currentScope;
-
-            variable = currentScope.createVariable(prototype);
+            variable = currentScope.createVariable(create(typeName, varName));
 
         }
 
@@ -221,7 +264,21 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     @Override
     public Void visitCallExpression(CallExpressionContext ctx) {
 
-        String functionName = ctx.IDENTIFIER().getText();
+        TerminalNode node  = ctx.IDENTIFIER();
+
+        FunctionPrototype function = (FunctionPrototype) currentScope.resolveProto(node.getText());
+
+        if(function == null) {
+
+            traceback(node);
+            vm.error("Can't resolve function: %s", Codes.ERROR_FUNCTION_NOT_FOUND, node.getText());
+
+        } else {
+
+            ctx.callParameters().accept(this);
+            callFunction(function);
+
+        }
 
         return null;
     }
@@ -277,6 +334,20 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
     @Override
     public Void visitParameterList(ParameterListContext ctx) {
+
+        List<TerminalNode> nodes = ctx.IDENTIFIER();
+        for (int i = 0; i < nodes.size(); i++) {
+            String typeName = nodes.get(i).getText();
+            String variableName = nodes.get(++i).getText();
+
+            VariablePrototype prototype = create(typeName, variableName);
+
+            pushToStack(prototype);
+
+        }
+
+        pushToStack(nodes.size() / 2);
+
         return null;
     }
 
@@ -295,6 +366,39 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
     @Override
     public Void visitFunctionDeclartion(FunctionDeclartionContext ctx) {
+
+        TerminalNode node = ctx.IDENTIFIER();
+
+        TypePrototype proto = currentScope.resolveProto(node.getText());
+
+        if(proto instanceof FunctionPrototype) {
+
+            traceback(node);
+            vm.error("Function %s is already defined", Codes.ERROR_FUNCTION_ALREADY_EXISTS, node.getText());
+
+        }else {
+
+            ctx.parameterList().accept(this); // read param list
+
+            int paramSize = pullFromStack(); // stack will be [size, VariablePrototype, ...]
+
+            List<VariablePrototype> prototypes = new ArrayList<>();
+
+            for (int i = 0; i < paramSize; i++) {
+
+                prototypes.add(pullFromStack()); // copy the stack elements
+
+            }
+
+            FunctionPrototype prototype = new FunctionPrototype();
+            prototype.id = node.getText();
+            prototype.parameters = prototypes;
+            prototype.block = ctx.block();
+
+            currentScope.registerPrototype(prototype); // register prototype
+
+
+        }
         return null;
     }
 
@@ -306,11 +410,7 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     @Override
     public Void visitCallParameters(CallParametersContext ctx) {
 
-        List<ExpressionContext> contextes = ctx.expression();
-
-        pushToStack(contextes.size());
-
-        for(ExpressionContext context : contextes)
+        for(ExpressionContext context : ctx.expression())
             context.accept(this); // evaluate parameters
 
         return null;
