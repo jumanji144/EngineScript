@@ -29,7 +29,23 @@ entry {
     
 }
 ```
+This is an example for Fibonacci Numbers:
+```js
+script fibonacci
+function fib(a) {
+    when a < 1
+        return a;
 
+    return fib(a - 1) + fib(a - 2);
+}
+
+entry {
+
+    print("Running entry function");
+    fib(a);
+
+}
+```
 ## API
 The Java API is currently the only way to access any members
 #### Example for getting the variable `sum` from the script above:
