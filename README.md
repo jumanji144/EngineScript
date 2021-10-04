@@ -83,3 +83,6 @@ public class VMTest {
 }
 
 ```
+
+# Contributing
+Feel free to make suggestions, leave issues or make a pull request
