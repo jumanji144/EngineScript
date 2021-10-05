@@ -1,10 +1,14 @@
 package enginescript.runtime.vm;
 
 import enginescript.EngineParser.EngineScript;
+import enginescript.runtime.api.Export;
+import enginescript.runtime.api.Module;
 import enginescript.runtime.vm.profiler.Profiler;
 import org.antlr.v4.runtime.Token;
 
 import java.lang.management.ManagementFactory;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Interface for the {@link VMExecutor} class
@@ -19,6 +23,9 @@ public class VM {
     public VMExecutor runtime;
     public VMMath math;
     public Profiler profiler;
+
+    Map<String, Export> defaultExports = new HashMap<>();
+    Map<String, Map<String, Export>> importedModules = new HashMap<>();
 
     boolean isDebug() {
         for(String arg : ManagementFactory.getRuntimeMXBean().getInputArguments()) {
@@ -120,6 +127,17 @@ public class VM {
     public void halt(Codes code) {
 
         System.exit(code.code);
+
+    }
+
+    public void loadModule(Module module) {
+
+        Map<String, Export> functions = Module.export(module);
+
+        if(module.isInternal())
+            defaultExports.putAll(functions);
+        else
+            importedModules.put(module.getPrefix(), functions);
 
     }
 

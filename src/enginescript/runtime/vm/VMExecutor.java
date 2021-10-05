@@ -1,6 +1,7 @@
 package enginescript.runtime.vm;
 
 import enginescript.EngineParser.EngineScriptVisitor;
+import enginescript.runtime.api.Export;
 import enginescript.runtime.object.Variable;
 import enginescript.runtime.proto.FunctionPrototype;
 import enginescript.runtime.proto.TypePrototype;
@@ -12,9 +13,8 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Stack;
+import java.lang.reflect.InvocationTargetException;
+import java.util.*;
 
 import static enginescript.EngineParser.EngineScript.*;
 
@@ -26,6 +26,7 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     public Scope previousScope;
     Stack<Object> stack = new Stack<>();
     Token tracebackElement;
+
     public VMExecutor(VM vm) {
         this.vm = vm;
     }
@@ -74,6 +75,8 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     public void callFunction(FunctionPrototype function) {
 
         enterScope(); // function upper
+
+        function.scope = currentScope;
 
         for(VariablePrototype prototype : function.parameters) {
 
@@ -271,6 +274,14 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
     @Override
     public Void visitStringExpression(StringExpressionContext ctx) {
+
+        String text = ctx.STRINGLITERAL().getText();
+
+        text = text.substring(1);
+
+        text = text.substring(0, text.length() - 1);
+
+        push(text);
         return null;
     }
 
@@ -290,6 +301,36 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
         if(function == null) {
 
+            Export export = vm.defaultExports.get(node.getText());
+
+            if(export != null && export.isMethod()) {
+
+                // prepare callsite
+                if(context != null)
+                    context.accept(this);
+
+                int paramSize = export.parameterSize();
+
+                Object[] params = new Object[paramSize];
+
+                // fill params with expressed values and ensure param buffer is right
+                for (int i = 0; i < paramSize; i++) {
+                    params[i] = pop();
+                }
+
+                try {
+                    push(export.call(params));
+                } catch (InvocationTargetException | IllegalAccessException e) {
+                    traceback(node);
+                    vm.error("Cannot call external function", Codes.ERROR_MODULE_EXTERNAL_ERROR);
+                    e.printStackTrace();
+                }
+
+                return null;
+
+
+            }
+
             traceback(node);
             vm.error("Can't resolve function: %s", Codes.ERROR_FUNCTION_NOT_FOUND, node.getText());
 
@@ -298,6 +339,7 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
             if(context != null)
              context.accept(this);
+
             callFunction(function);
 
         }
