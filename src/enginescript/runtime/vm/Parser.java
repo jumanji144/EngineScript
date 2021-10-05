@@ -2,8 +2,7 @@ package enginescript.runtime.vm;
 
 import enginescript.EngineParser.EngineScript;
 import enginescript.EngineParser.EngineScriptLexer;
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,6 +26,9 @@ public class Parser {
 
         EngineScript.ProgramContext context = parser.program();
 
+        if(parser.getNumberOfSyntaxErrors() > 0)
+            System.exit(1);
+
         return new Program(context.IDENTIFIER().getText(), "<STDIO>", context);
 
     }
@@ -40,6 +42,9 @@ public class Parser {
         init(string);
 
         EngineScript.ProgramContext context = parser.program();
+
+        if(parser.getNumberOfSyntaxErrors() > 0)
+            System.exit(1);
 
         return new Program(context.IDENTIFIER().getText(), file.getAbsolutePath(), context);
 
