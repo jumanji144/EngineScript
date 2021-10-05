@@ -12,10 +12,9 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
+import java.util.Stack;
 
 import static enginescript.EngineParser.EngineScript.*;
 
@@ -25,7 +24,7 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     // persistent variables
     public Scope currentScope;
     public Scope previousScope;
-    Queue<Object> stack = new ArrayDeque<>();
+    Stack<Object> stack = new Stack<>();
     Token tracebackElement;
     public VMExecutor(VM vm) {
         this.vm = vm;
@@ -68,7 +67,7 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
         expression.accept(this); // children of expressions should push a value to the stack
 
-        return stack.poll(); // then we return the stack pushed value
+        return stack.pop(); // then we return the stack pushed value
 
     }
 
@@ -79,7 +78,7 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
         for(VariablePrototype prototype : function.parameters) {
 
             Variable variable = currentScope.createVariable(prototype);
-            variable.setValue(pullFromStack());
+            variable.setValue(pop());
 
         }
 
@@ -94,15 +93,18 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T pullFromStack() {
+    public <T> T pop() {
 
-        return (T) stack.poll();
+        if(stack.empty())
+            return null;
+
+        return (T) stack.pop();
 
     }
 
-    public <T> void pushToStack(T value) {
+    public <T> void push(T value) {
 
-        stack.add(value);
+        stack.push(value);
 
     }
 
@@ -127,7 +129,11 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     @Override
     public Void visitProgram(ProgramContext ctx) {
 
+        vm.profiler.start("root");
+
         ctx.block().accept(this);
+
+        vm.profiler.end();
 
         return null;
     }
@@ -135,13 +141,19 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     @Override
     public Void visitBlock(BlockContext ctx) {
 
+        vm.profiler.start("Block");
+
         List<StatementContext> statements = ctx.statement();
 
         enterScope();
 
-        statements.forEach(statement -> statement.accept(this)); // execute block code
+        for (StatementContext statement : statements) {
+            statement.accept(this);
+        }
 
         leaveScope();
+
+        vm.profiler.end();
 
         if (currentScope == null) { // no code to return to
             if (vm.HALT_ON_END)
@@ -154,7 +166,13 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     @Override
     public Void visitStatement(StatementContext ctx) {
 
-        ctx.getChild(0).accept(this);
+        ParserRuleContext statement = (ParserRuleContext) ctx.getChild(0);
+
+        vm.profiler.start(statement.getClass().getSimpleName());
+
+        statement.accept(this);
+
+        vm.profiler.end();
 
         return null;
     }
@@ -240,11 +258,11 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
         if (value == (long) value) { // is an integer
 
-            pushToStack((int) value);
+            push((int) value);
 
         } else {
 
-            pushToStack(value);
+            push(value);
 
         }
 
@@ -268,6 +286,8 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
         FunctionPrototype function = (FunctionPrototype) currentScope.resolveProto(node.getText());
 
+        CallParametersContext context = ctx.callParameters();
+
         if(function == null) {
 
             traceback(node);
@@ -275,7 +295,9 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
         } else {
 
-            ctx.callParameters().accept(this);
+
+            if(context != null)
+             context.accept(this);
             callFunction(function);
 
         }
@@ -289,12 +311,12 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
         ctx.expression(0).accept(this);
         ctx.expression(1).accept(this);
 
-        Object left = pullFromStack();
-        Object right = pullFromStack();
+        Object left = pop();
+        Object right = pop();
 
         String operation = getToken(ctx, 0).getText();
 
-        pushToStack(vm.math.op(left, right, operation));
+        push(vm.math.op(left, right, operation));
 
         return null;
     }
@@ -312,7 +334,13 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     @Override
     public Void visitExpressionStatement(ExpressionStatementContext ctx) {
 
-        ctx.expression().accept(this);
+        ExpressionContext expression = ctx.expression();
+
+        vm.profiler.start(expression.getClass().getSimpleName());
+
+        expression.accept(this);
+
+        vm.profiler.end();
 
         return null;
     }
@@ -336,17 +364,18 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     public Void visitParameterList(ParameterListContext ctx) {
 
         List<TerminalNode> nodes = ctx.IDENTIFIER();
+
         for (int i = 0; i < nodes.size(); i++) {
             String typeName = nodes.get(i).getText();
             String variableName = nodes.get(++i).getText();
 
             VariablePrototype prototype = create(typeName, variableName);
 
-            pushToStack(prototype);
+            push(prototype);
 
         }
 
-        pushToStack(nodes.size() / 2);
+        push(nodes.size() / 2); // push proper proto list size
 
         return null;
     }
@@ -380,13 +409,13 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
             ctx.parameterList().accept(this); // read param list
 
-            int paramSize = pullFromStack(); // stack will be [size, VariablePrototype, ...]
+            int paramSize = pop(); // stack will be [size, VariablePrototype, ...]
 
             List<VariablePrototype> prototypes = new ArrayList<>();
 
             for (int i = 0; i < paramSize; i++) {
 
-                prototypes.add(pullFromStack()); // copy the stack elements
+                prototypes.add(pop()); // copy the stack elements
 
             }
 
