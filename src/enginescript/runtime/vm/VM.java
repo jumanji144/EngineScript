@@ -1,7 +1,10 @@
 package enginescript.runtime.vm;
 
 import enginescript.EngineParser.EngineScript;
+import enginescript.runtime.vm.profiler.Profiler;
 import org.antlr.v4.runtime.Token;
+
+import java.lang.management.ManagementFactory;
 
 /**
  * Interface for the {@link VMExecutor} class
@@ -10,15 +13,29 @@ public class VM {
 
     public boolean EXIT_ON_ERROR = true;
     public boolean HALT_ON_END = false; // halt when execution ends
+    public boolean STACKTRACE_ON_ERROR = true; // used for vm debugging purposes
     public Program program;
 
     public VMExecutor runtime;
     public VMMath math;
+    public Profiler profiler;
+
+    boolean isDebug() {
+        for(String arg : ManagementFactory.getRuntimeMXBean().getInputArguments()) {
+            if(arg.contains("jdwp=")) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     public void init() {
 
         runtime = new VMExecutor(this);
         math = new VMMath(this);
+        profiler = new Profiler();
+
+        this.profiler.profilingEnabled = !isDebug();
 
     }
 
@@ -91,8 +108,12 @@ public class VM {
 
     public void escape(Codes code) {
 
+        if(STACKTRACE_ON_ERROR)
+            throw new RuntimeException();
+
         if(EXIT_ON_ERROR)
             halt(code);
+
 
     }
 
