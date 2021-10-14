@@ -24,9 +24,9 @@ public class VMMath {
         if (isNumber(left)) {
 
             if (!isNumber(right))
-                vm.error("Operator + cannot be applied to %s,%s",
+                vm.error("Operator %s cannot be applied to %s,%s",
                         Codes.ERROR_MATH_INVALID_OPERATOR,
-                        leftType, rightType);
+                        operator, leftType, rightType);
             else {
 
                 float a = ((Number) left).floatValue();
@@ -60,6 +60,42 @@ public class VMMath {
         }
 
         return null;
+
+    }
+
+    public boolean compare(Object left, Object right, String operator) {
+
+        VariableType leftType = VariableType.fromObject(left);
+        VariableType rightType = VariableType.fromObject(right);
+
+        if (isNumber(left)) {
+
+            if (!isNumber(right))
+                vm.error("Operator %s cannot be applied to %s,%s",
+                        Codes.ERROR_MATH_INVALID_OPERATOR,
+                        operator, leftType, rightType);
+            else {
+
+                float a = ((Number) left).floatValue();
+                float b = ((Number) right).floatValue();
+
+                switch (operator) {
+
+                    case ">":
+                        return a > b;
+                    case "<":
+                        return a < b;
+                    case "=":
+                        return a == b;
+
+                }
+
+
+            }
+
+        }
+
+        return false;
 
     }
 

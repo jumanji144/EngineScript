@@ -36,6 +36,9 @@ public class VariablePrototype extends Prototype{
             case "string":
             case "str":
                 return VariableType.STRING;
+            case "bool":
+            case "boolean":
+                return VariableType.BOOLEAN;
             case "var": {
 
                 return VariableType.UNDEFINED;

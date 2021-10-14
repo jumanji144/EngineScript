@@ -21,6 +21,8 @@ public class Scope {
     final VM vm;
     Scope parent;
 
+    // TODO Make TypeProto not scope based due to one time declaration in program context
+
     Map<String, TypePrototype> cachedProperties = new HashMap<>();
     Map<String, PrototypedObject> propertyInstances = new HashMap<>();
 

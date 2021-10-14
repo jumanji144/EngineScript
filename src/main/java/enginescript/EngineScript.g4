@@ -19,9 +19,9 @@ expression:
      IDENTIFIER                                          # IdentifierExpression
    | STRINGLITERAL                                       # StringExpression
    | DECIMALLITERAL                                      # DecimalExpression
+   | BOOLLITERAL                                         # BooleanExpression
    | expression ('*' | '/') expression                   # ArithmeticOrLogicalExpression
    | expression ('+' | '-') expression                   # ArithmeticOrLogicalExpression
-   | LPAREN expression RPAREN                            # ArithmeticBracketExpression
    | expression comparisonOperator expression            # ComparisonExpression
    | IDENTIFIER '(' callParameters? ')'                  # CallExpression
    | expression '.' IDENTIFIER                           # FieldExpression
@@ -33,7 +33,7 @@ expressionStatement:
    expression ';';
 
 returnStatement:
- 'return' expression?;
+ 'return' expression? SEMI;
 
 comparisonOperator
    : RELATION

@@ -64,6 +64,18 @@ public class EngineScriptBaseListener implements EngineScriptListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterBooleanExpression(EngineScript.BooleanExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitBooleanExpression(EngineScript.BooleanExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterAssignExpression(EngineScript.AssignExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -71,18 +83,6 @@ public class EngineScriptBaseListener implements EngineScriptListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitAssignExpression(EngineScript.AssignExpressionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterArithmeticBracketExpression(EngineScript.ArithmeticBracketExpressionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitArithmeticBracketExpression(EngineScript.ArithmeticBracketExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

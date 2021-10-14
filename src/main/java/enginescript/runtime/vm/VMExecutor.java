@@ -14,7 +14,9 @@ import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.lang.reflect.InvocationTargetException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Stack;
 
 import static enginescript.EngineParser.EngineScript.*;
 
@@ -26,6 +28,7 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
     public Scope previousScope;
     Stack<Object> stack = new Stack<>();
     Token tracebackElement;
+    boolean shouldBreak;
 
     public VMExecutor(VM vm) {
         this.vm = vm;
@@ -57,10 +60,7 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
     public void leaveScope() {
 
-        previousScope = currentScope;
-
-        if(currentScope.parent != null)
-            currentScope = currentScope.parent;
+        currentScope = previousScope;
 
     }
 
@@ -92,6 +92,24 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
         function.block.accept(this);
 
         leaveScope();
+
+    }
+
+    public Variable resolveVariable(TerminalNode context) {
+
+        String id = context.getText();
+
+        Variable variable = (Variable) currentScope.resolveInstance(id);
+
+        if(variable == null) {
+
+            traceback(context); // place traceback to text element
+            vm.error("Variable %s cannot be found", Codes.ERROR_VARIABLE_NOT_FOUND, id);
+            return null;
+
+        }
+
+        return variable;
 
     }
 
@@ -141,6 +159,12 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
         return null;
     }
 
+    public void breakBlock() {
+
+        shouldBreak = true;
+
+    }
+
     @Override
     public Void visitBlock(BlockContext ctx) {
 
@@ -151,8 +175,13 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
         enterScope();
 
         for (StatementContext statement : statements) {
+            if(shouldBreak) {
+                break;
+            }
             statement.accept(this);
         }
+
+        shouldBreak = false;
 
         leaveScope();
 
@@ -182,6 +211,32 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
     @Override
     public Void visitComparisonExpression(ComparisonExpressionContext ctx) {
+
+        ctx.expression(0).accept(this);
+        ctx.expression(1).accept(this);
+
+        Object left = pop();
+        Object right = pop();
+
+        String operation = ctx.comparisonOperator().getText();
+
+        push(vm.math.compare(right, left, operation));
+
+        return null;
+    }
+
+    @Override
+    public Void visitBooleanExpression(BooleanExpressionContext ctx) {
+
+        switch (ctx.BOOLLITERAL().getText()) {
+
+            case "true":
+                push(true);
+            case "false":
+                push(false);
+
+        }
+
         return null;
     }
 
@@ -210,17 +265,7 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
         if (nodes.size() == 1) { // reassign
 
-            String varName = nodes.get(0).getText();
-
-            variable = (Variable) currentScope.resolveInstance(varName);
-
-            if (variable == null) {
-
-                traceback(nodes.get(0)); // place traceback to text element
-                vm.error("Variable %s cannot be found", Codes.ERROR_VARIABLE_NOT_FOUND, varName);
-                return null;
-
-            }
+            variable = resolveVariable(nodes.get(0));
 
         } else {
 
@@ -241,11 +286,6 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
         }
 
 
-        return null;
-    }
-
-    @Override
-    public Void visitArithmeticBracketExpression(ArithmeticBracketExpressionContext ctx) {
         return null;
     }
 
@@ -319,7 +359,7 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
                 }
 
                 try {
-                    push(export.call(params));
+                    export.call(params);
                 } catch (InvocationTargetException | IllegalAccessException e) {
                     traceback(node);
                     vm.error("Cannot call external function", Codes.ERROR_MODULE_EXTERNAL_ERROR);
@@ -358,13 +398,17 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
         String operation = getToken(ctx, 0).getText();
 
-        push(vm.math.op(left, right, operation));
+        traceback(getToken(ctx, 0));
+        push(vm.math.op(right, left, operation));
 
         return null;
     }
 
     @Override
     public Void visitIdentifierExpression(IdentifierExpressionContext ctx) {
+
+        push(resolveVariable(ctx.IDENTIFIER()).getValue());
+
         return null;
     }
 
@@ -389,16 +433,43 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
     @Override
     public Void visitReturnStatement(ReturnStatementContext ctx) {
+
+        ExpressionContext context = ctx.expression();
+
+        if(context != null)
+            context.accept(this); // pushes return value to stack
+
+        breakBlock();
+
         return null;
     }
 
     @Override
     public Void visitComparisonOperator(ComparisonOperatorContext ctx) {
+
+        String child = ctx.getChild(0).getText();
+
+        push(child);
+
         return null;
     }
 
     @Override
     public Void visitIfStatement(IfStatementContext ctx) {
+
+        ctx.expression().accept(this);
+
+        Object expression = pop();
+
+        if(expression == null)
+            return null;
+
+        if(expression instanceof Boolean) {
+            if ((Boolean) expression)
+                ctx.block(0).accept(this);
+        }else
+            ctx.block(0).accept(this);
+
         return null;
     }
 
@@ -480,9 +551,12 @@ public class VMExecutor implements EngineScriptVisitor<Void> {
 
     @Override
     public Void visitCallParameters(CallParametersContext ctx) {
+        vm.profiler.start("CallParametersContext");
 
         for(ExpressionContext context : ctx.expression())
             context.accept(this); // evaluate parameters
+
+        vm.profiler.end();
 
         return null;
     }

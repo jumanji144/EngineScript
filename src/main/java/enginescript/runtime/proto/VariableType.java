@@ -7,6 +7,7 @@ public enum VariableType {
     INTEGER,
     STRING,
     BYTE,
+    BOOLEAN,
     FLOAT,
     MEMBER,
     STRUCTURE,
@@ -25,6 +26,8 @@ public enum VariableType {
             return FLOAT;
         else if(object instanceof Structure)
             return STRUCTURE;
+        else if (object instanceof Boolean)
+            return BOOLEAN;
         else if(object == null)
             return UNDEFINED;
 

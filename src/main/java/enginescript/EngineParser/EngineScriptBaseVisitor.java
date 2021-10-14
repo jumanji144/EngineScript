@@ -45,14 +45,14 @@ public class EngineScriptBaseVisitor<T> extends AbstractParseTreeVisitor<T> impl
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAssignExpression(EngineScript.AssignExpressionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitBooleanExpression(EngineScript.BooleanExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitArithmeticBracketExpression(EngineScript.ArithmeticBracketExpressionContext ctx) { return visitChildren(ctx); }
+	@Override public T visitAssignExpression(EngineScript.AssignExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *

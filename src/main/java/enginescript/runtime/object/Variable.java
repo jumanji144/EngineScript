@@ -6,6 +6,10 @@ import enginescript.runtime.vm.Codes;
 
 public class Variable extends PrototypedObject<VariablePrototype> {
 
+    public Object getValue() {
+        return value;
+    }
+
     Object value;
 
     public Variable(VariablePrototype prototype) {

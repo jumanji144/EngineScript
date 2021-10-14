@@ -50,6 +50,18 @@ public interface EngineScriptListener extends ParseTreeListener {
 	 */
 	void exitComparisonExpression(EngineScript.ComparisonExpressionContext ctx);
 	/**
+	 * Enter a parse tree produced by the {@code BooleanExpression}
+	 * labeled alternative in {@link EngineScript#expression}.
+	 * @param ctx the parse tree
+	 */
+	void enterBooleanExpression(EngineScript.BooleanExpressionContext ctx);
+	/**
+	 * Exit a parse tree produced by the {@code BooleanExpression}
+	 * labeled alternative in {@link EngineScript#expression}.
+	 * @param ctx the parse tree
+	 */
+	void exitBooleanExpression(EngineScript.BooleanExpressionContext ctx);
+	/**
 	 * Enter a parse tree produced by the {@code AssignExpression}
 	 * labeled alternative in {@link EngineScript#expression}.
 	 * @param ctx the parse tree
@@ -61,18 +73,6 @@ public interface EngineScriptListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitAssignExpression(EngineScript.AssignExpressionContext ctx);
-	/**
-	 * Enter a parse tree produced by the {@code ArithmeticBracketExpression}
-	 * labeled alternative in {@link EngineScript#expression}.
-	 * @param ctx the parse tree
-	 */
-	void enterArithmeticBracketExpression(EngineScript.ArithmeticBracketExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by the {@code ArithmeticBracketExpression}
-	 * labeled alternative in {@link EngineScript#expression}.
-	 * @param ctx the parse tree
-	 */
-	void exitArithmeticBracketExpression(EngineScript.ArithmeticBracketExpressionContext ctx);
 	/**
 	 * Enter a parse tree produced by the {@code MethodCallExpression}
 	 * labeled alternative in {@link EngineScript#expression}.
